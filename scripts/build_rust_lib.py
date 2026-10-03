@@ -4,8 +4,10 @@ library and link it into the firmware.
 
 The crate path defaults to lib/rust-lib and can be overridden per env with
 `custom_rust_lib_dir`. The Rust target is chosen from the board MCU; only the
-ESP32-S3 (Xtensa) is wired up today. Defines CROSSPOINT_RUST_LIB=1 so sources
-can guard calls into the library.
+ESP32-S3 (Xtensa) is wired up today. The crate builds against std using the
+ESP-IDF targets; std's libc/pthread dependencies resolve against the ESP-IDF
+libraries that Arduino-ESP32 already links. Defines CROSSPOINT_RUST_LIB=1 so
+sources can guard calls into the library.
 """
 
 import json
@@ -16,7 +18,7 @@ import sys
 Import("env")  # noqa: F821  (provided by SCons)
 
 RUST_TARGETS = {
-    "esp32s3": "xtensa-esp32s3-none-elf",
+    "esp32s3": "xtensa-esp32s3-espidf",
 }
 PROFILE = "release"
 
@@ -36,11 +38,21 @@ target = RUST_TARGETS.get(mcu)
 if target is None:
     fail(f"no Rust target configured for MCU '{mcu}'")
 
+def cargo_env():
+    """Environment for cargo. ESP-IDF >= 5 uses a 64-bit time_t, which the
+    libc crate (and thus std) only matches with --cfg espidf_time64."""
+    cargo_env = dict(os.environ)
+    var = "CARGO_TARGET_" + target.upper().replace("-", "_") + "_RUSTFLAGS"
+    cargo_env[var] = " ".join(filter(None, [cargo_env.get(var), "--cfg espidf_time64"]))
+    return cargo_env
+
+
 def run_cargo(args):
     cmd = ["cargo", "+esp"] + args
     print(f"build_rust_lib.py: {' '.join(cmd)} (in {crate_dir})")
     try:
-        return subprocess.run(cmd, cwd=crate_dir, check=True, stdout=subprocess.PIPE, text=True).stdout
+        return subprocess.run(cmd, cwd=crate_dir, env=cargo_env(), check=True, stdout=subprocess.PIPE,
+                              text=True).stdout
     except FileNotFoundError:
         fail("cargo not found on PATH; install rustup and the esp toolchain (espup)")
     except subprocess.CalledProcessError as e:
@@ -53,10 +65,11 @@ def build_crate():
     metadata = json.loads(run_cargo(["metadata", "--no-deps", "--format-version=1"]))
     package_id = metadata["packages"][0]["id"]
 
-    # Build no_std (core only) for esp32. Diagnostics are rendered to stderr;
-    # stdout carries one JSON message per line.
+    # The esp toolchain ships no prebuilt std for the ESP-IDF targets, so build
+    # it from source. Diagnostics are rendered to stderr; stdout carries one
+    # JSON message per line.
     out = run_cargo([
-        "build", "-Zbuild-std=core", f"--profile={PROFILE}", f"--target={target}",
+        "build", "-Zbuild-std=std,panic_abort", f"--profile={PROFILE}", f"--target={target}",
         "--message-format=json-render-diagnostics",
     ])
     for line in out.splitlines():
