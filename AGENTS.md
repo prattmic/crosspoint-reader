@@ -1,3 +1,16 @@
+# Local details
+
+This repository is a fork of crosspoint-reader which integrates Rust support for building certain libraries in Rust.
+
+Guidelines:
+
+* This repo uses `jj` for version control. Do not use `git`.
+* Do not make new commits or modify existing commits. Leave changes uncommitted and stop to allow the operator to make the commit/modification.
+* `pio run -e x4pro-rust` builds with the Rust components. `pio run -e x4pro` builds without Rust.
+* Calls into Rust components are guarded with `#ifdef CROSSPOINT_RUST_LIB`.
+
+The rest of this document is the upstream instructions, which may be useful for reference.
+
 # CrossPoint Reader Development Guide
 
 Project: Open-source e-reader firmware for Xteink X4 (ESP32-C3)
