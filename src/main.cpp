@@ -22,7 +22,6 @@
 #include <XteinkDetect.h>
 #include <builtinFonts/all.h>
 
-#include <cinttypes>
 #include <cstring>
 
 #include "CrossPointSettings.h"
@@ -43,10 +42,6 @@
 #include "util/PluginEvents.h"
 #include "util/ScreenshotUtil.h"
 #include "util/Timezones.h"
-
-#ifdef CROSSPOINT_RUST_LIB
-#include <rust_lib.h>
-#endif
 
 #if CROSSPOINT_VECTOR_FONTS
 // Rendering (incl. FreeType TTF rasterization) runs on the Arduino loop task.
@@ -712,9 +707,6 @@ void loop() {
     const auto psram = HalMemory::getPsramHeap();
     LOG_INF("MEM", "PSRAM: Free: %zu bytes, Total: %zu bytes, Min Free: %zu bytes, MaxAlloc: %zu bytes",
             psram.freeBytes, psram.totalBytes, psram.minFreeBytes, psram.largestBlockBytes);
-#endif
-#ifdef CROSSPOINT_RUST_LIB
-    LOG_INF("RUST", "rust_lib_add(2, 3) = %" PRIu64, rust_lib_add(2, 3));
 #endif
     lastMemPrint = millis();
   }
