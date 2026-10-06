@@ -4,7 +4,7 @@ librust_lib.a (the workspace's staticlib crate) into the firmware.
 
 The workspace path defaults to lib/rust and can be overridden per env with
 `custom_rust_lib_dir`. Each workspace crate generates its own C++ header (e.g.
-rust_epub.h); every one is added to the include path. The Rust target is chosen
+rust/epub.h); every one is added to the include path. The Rust target is chosen
 from the board MCU; only the ESP32-S3 (Xtensa) is wired up today. The crates
 build against std using the ESP-IDF targets; std's libc/pthread dependencies
 resolve against the ESP-IDF libraries that Arduino-ESP32 already links. Defines

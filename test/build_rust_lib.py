@@ -4,9 +4,10 @@ Build the lib/rust workspace for the host so the gtest suites can link it.
 Invoked by test/CMakeLists.txt when CROSSPOINT_RUST_LIB is ON. Builds the
 workspace with the host toolchain into TARGET_DIR (so it never races the
 firmware build in lib/rust/target) and copies each workspace crate's
-cbindgen-generated header from its build script's OUT_DIR into INCLUDE_DIR. A
-header is only rewritten when it changes, so an unchanged crate does not force
-C++ recompiles. Headers in INCLUDE_DIR that no crate generated are removed.
+cbindgen-generated header from its build script's OUT_DIR/rust into
+INCLUDE_DIR/rust. A header is only rewritten when it changes, so an unchanged
+crate does not force C++ recompiles. Headers in INCLUDE_DIR/rust that no crate
+generated are removed.
 
 Usage: build_rust_lib.py WORKSPACE_DIR TARGET_DIR PROFILE INCLUDE_DIR
 """
@@ -38,18 +39,21 @@ def main():
     if not out_dirs:
         sys.exit("build_rust_lib.py: cargo did not report any workspace build script OUT_DIR")
 
-    os.makedirs(include_dir, exist_ok=True)
+    # Headers live in a rust/ subdirectory so C++ includes them as <rust/name.h>.
+    dest_dir = os.path.join(include_dir, "rust")
+    os.makedirs(dest_dir, exist_ok=True)
     headers = set()
     for out_dir in out_dirs:
-        for name in os.listdir(out_dir):
+        src_dir = os.path.join(out_dir, "rust")
+        for name in os.listdir(src_dir):
             if name.endswith(".h"):
                 headers.add(name)
-                copy_if_changed(os.path.join(out_dir, name), os.path.join(include_dir, name))
+                copy_if_changed(os.path.join(src_dir, name), os.path.join(dest_dir, name))
 
     # Remove headers of renamed or removed crates so stale includes fail to build.
-    for name in os.listdir(include_dir):
+    for name in os.listdir(dest_dir):
         if name.endswith(".h") and name not in headers:
-            os.remove(os.path.join(include_dir, name))
+            os.remove(os.path.join(dest_dir, name))
 
 
 def copy_if_changed(src, dest):

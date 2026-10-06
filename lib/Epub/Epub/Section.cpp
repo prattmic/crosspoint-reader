@@ -9,7 +9,7 @@
 
 #ifdef CROSSPOINT_RUST_LIB
 #include <cinttypes>
-#include <rust_lib.h>
+#include <rust/rust_lib.h>
 #endif
 
 #include "Epub/css/CssParser.h"

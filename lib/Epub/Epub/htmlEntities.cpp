@@ -7,7 +7,7 @@
 #include <iterator>
 
 #ifdef CROSSPOINT_RUST_LIB
-#include <rust_epub.h>
+#include <rust/epub.h>
 #endif
 
 struct EntityPair {
