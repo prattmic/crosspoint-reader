@@ -7,11 +7,6 @@
 #include <Memory.h>
 #include <Serialization.h>
 
-#ifdef CROSSPOINT_RUST_LIB
-#include <cinttypes>
-#include <rust/rust_lib.h>
-#endif
-
 #include "Epub/css/CssParser.h"
 #include "Page.h"
 #include "hyphenation/Hyphenator.h"
@@ -111,9 +106,6 @@ uint32_t Section::onPageComplete(std::unique_ptr<Page> page) {
     return 0;
   }
   LOG_DBG("SCT", "Page %d processed", builtPageCount_);
-#ifdef CROSSPOINT_RUST_LIB
-  LOG_INF("RUST", "rust_lib_add(2, 3) = %" PRIu64, rust_lib_add(2, 3));
-#endif
 
   builtPageCount_++;
   // pageCount is the pages available to read: a rebuild over a partial only raises it
