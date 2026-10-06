@@ -35,6 +35,48 @@ target_compile_options(crosspoint_test_common INTERFACE
   -pedantic
 )
 
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+# Build lib/rust-lib for the host and link it into every test, mirroring the
+# firmware's x4pro-rust env (scripts/build_rust_lib.py), so code guarded by
+# CROSSPOINT_RUST_LIB is tested against the Rust implementation.
+option(CROSSPOINT_RUST_LIB "Build and link lib/rust-lib (requires cargo)" OFF)
+if(CROSSPOINT_RUST_LIB)
+  find_program(CARGO_EXECUTABLE cargo REQUIRED)
+  find_package(Threads REQUIRED)
+
+  set(RUST_LIB_CRATE_DIR "${REPO_ROOT}/lib/rust-lib")
+  set(RUST_LIB_TARGET_DIR "${CMAKE_CURRENT_BINARY_DIR}/rust-lib")
+  set(RUST_LIB_INCLUDE_DIR "${RUST_LIB_TARGET_DIR}/include")
+  set(RUST_LIB_ARCHIVE "${RUST_LIB_TARGET_DIR}/release/${CMAKE_STATIC_LIBRARY_PREFIX}rust_lib${CMAKE_STATIC_LIBRARY_SUFFIX}")
+
+  # Always run: cargo tracks the crate's own dependencies and is a fast no-op
+  # when nothing changed.
+  add_custom_target(rust_lib_build
+    COMMAND ${CMAKE_COMMAND} -E env CARGO=${CARGO_EXECUTABLE}
+      ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/build_rust_lib.py
+      ${RUST_LIB_CRATE_DIR} ${RUST_LIB_TARGET_DIR} release ${RUST_LIB_INCLUDE_DIR}
+    BYPRODUCTS ${RUST_LIB_ARCHIVE} ${RUST_LIB_INCLUDE_DIR}/rust_lib.h
+    COMMENT "Building lib/rust-lib with cargo"
+    USES_TERMINAL
+  )
+
+  # Must exist at configure time for INTERFACE_INCLUDE_DIRECTORIES.
+  file(MAKE_DIRECTORY ${RUST_LIB_INCLUDE_DIR})
+
+  add_library(rust_lib STATIC IMPORTED GLOBAL)
+  set_target_properties(rust_lib PROPERTIES
+    IMPORTED_LOCATION ${RUST_LIB_ARCHIVE}
+    INTERFACE_INCLUDE_DIRECTORIES ${RUST_LIB_INCLUDE_DIR}
+    INTERFACE_COMPILE_DEFINITIONS CROSSPOINT_RUST_LIB=1
+    # Native libraries Rust's std needs on the host.
+    INTERFACE_LINK_LIBRARIES "Threads::Threads;${CMAKE_DL_LIBS}"
+  )
+  add_dependencies(rust_lib rust_lib_build)
+
+  target_link_libraries(crosspoint_test_common INTERFACE rust_lib)
+endif()
+
 enable_testing()
 include(GoogleTest)
 
@@ -80,5 +122,4 @@ add_subdirectory(reader_session)
 add_subdirectory(plugin_manifest_classification)
 add_subdirectory(protected_paths)
 
-find_package(Python3 REQUIRED COMPONENTS Interpreter)
 add_test(NAME TrustedTimeTimezone COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_trusted_time.py)
