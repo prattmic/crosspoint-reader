@@ -8,7 +8,8 @@ Guidelines:
 * Do not make new commits or modify existing commits. Leave changes uncommitted and stop to allow the operator to make the commit/modification.
 * `pio run -e x4pro-rust` builds with the Rust components. `pio run -e x4pro` builds without Rust.
 * Calls into Rust components are guarded with `#ifdef CROSSPOINT_RUST_LIB`.
-* pio build system integration is via `script/build_rust_lib.py`.
+* See lib/rust/README.md for Rust build details.
+* See test/README for C++ + Rust test details.
 
 The rest of this document is the upstream instructions, which may be useful for reference.
 

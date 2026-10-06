@@ -1,13 +1,14 @@
 """
-Build lib/rust-lib for the host so the gtest suites can link it.
+Build the lib/rust workspace for the host so the gtest suites can link it.
 
 Invoked by test/CMakeLists.txt when CROSSPOINT_RUST_LIB is ON. Builds the
-crate with the host toolchain into TARGET_DIR (so it never races the firmware
-build in lib/rust-lib/target) and copies the cbindgen-generated rust_lib.h from
-the build script's OUT_DIR into INCLUDE_DIR. The header is only rewritten when
-it changes, so an unchanged crate does not force C++ recompiles.
+workspace with the host toolchain into TARGET_DIR (so it never races the
+firmware build in lib/rust/target) and copies each workspace crate's
+cbindgen-generated header from its build script's OUT_DIR into INCLUDE_DIR. A
+header is only rewritten when it changes, so an unchanged crate does not force
+C++ recompiles. Headers in INCLUDE_DIR that no crate generated are removed.
 
-Usage: build_rust_lib.py CRATE_DIR TARGET_DIR PROFILE INCLUDE_DIR
+Usage: build_rust_lib.py WORKSPACE_DIR TARGET_DIR PROFILE INCLUDE_DIR
 """
 
 import json
@@ -17,30 +18,43 @@ import sys
 
 
 def main():
-    crate_dir, target_dir, profile, include_dir = sys.argv[1:]
+    workspace_dir, target_dir, profile, include_dir = sys.argv[1:]
 
     def cargo(args):
-        cmd = [os.environ.get("CARGO", "cargo")] + args + ["--manifest-path", os.path.join(crate_dir, "Cargo.toml")]
+        cmd = [os.environ.get("CARGO", "cargo")] + args + ["--manifest-path", os.path.join(workspace_dir, "Cargo.toml")]
         env = dict(os.environ, CARGO_TARGET_DIR=target_dir)
         return subprocess.run(cmd, env=env, check=True, stdout=subprocess.PIPE, text=True).stdout
 
     metadata = json.loads(cargo(["metadata", "--no-deps", "--format-version=1"]))
-    package_id = metadata["packages"][0]["id"]
+    member_ids = set(metadata["workspace_members"])
 
-    out_dir = None
+    out_dirs = []
     # Diagnostics are rendered to stderr; stdout carries one JSON message per line.
     for line in cargo(["build", f"--profile={profile}", "--message-format=json-render-diagnostics"]).splitlines():
         msg = json.loads(line)
         # Cargo emits this message for fresh build scripts too, not only reruns.
-        if msg.get("reason") == "build-script-executed" and msg.get("package_id") == package_id:
-            out_dir = msg["out_dir"]
-    if out_dir is None:
-        sys.exit("build_rust_lib.py: cargo did not report the rust-lib build script's OUT_DIR")
+        if msg.get("reason") == "build-script-executed" and msg.get("package_id") in member_ids:
+            out_dirs.append(msg["out_dir"])
+    if not out_dirs:
+        sys.exit("build_rust_lib.py: cargo did not report any workspace build script OUT_DIR")
 
-    with open(os.path.join(out_dir, "rust_lib.h"), "rb") as f:
-        header = f.read()
-    dest = os.path.join(include_dir, "rust_lib.h")
     os.makedirs(include_dir, exist_ok=True)
+    headers = set()
+    for out_dir in out_dirs:
+        for name in os.listdir(out_dir):
+            if name.endswith(".h"):
+                headers.add(name)
+                copy_if_changed(os.path.join(out_dir, name), os.path.join(include_dir, name))
+
+    # Remove headers of renamed or removed crates so stale includes fail to build.
+    for name in os.listdir(include_dir):
+        if name.endswith(".h") and name not in headers:
+            os.remove(os.path.join(include_dir, name))
+
+
+def copy_if_changed(src, dest):
+    with open(src, "rb") as f:
+        header = f.read()
     try:
         with open(dest, "rb") as f:
             if f.read() == header:

@@ -1,0 +1,13 @@
+[package]
+name = "rust-lib"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+epub.workspace = true
+
+[build-dependencies]
+build-support.workspace = true

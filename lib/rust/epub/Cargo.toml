@@ -1,0 +1,10 @@
+[package]
+name = "epub"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+phf.workspace = true
+
+[build-dependencies]
+build-support.workspace = true

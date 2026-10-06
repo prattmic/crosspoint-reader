@@ -1,0 +1,7 @@
+[package]
+name = "build-support"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+cbindgen = { version = "0.29", default-features = false }

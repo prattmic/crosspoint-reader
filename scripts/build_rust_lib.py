@@ -1,13 +1,14 @@
 """
-PlatformIO pre-build script: build the lib/rust-lib crate as a static
-library and link it into the firmware.
+PlatformIO pre-build script: build the lib/rust Cargo workspace and link its
+librust_lib.a (the workspace's staticlib crate) into the firmware.
 
-The crate path defaults to lib/rust-lib and can be overridden per env with
-`custom_rust_lib_dir`. The Rust target is chosen from the board MCU; only the
-ESP32-S3 (Xtensa) is wired up today. The crate builds against std using the
-ESP-IDF targets; std's libc/pthread dependencies resolve against the ESP-IDF
-libraries that Arduino-ESP32 already links. Defines CROSSPOINT_RUST_LIB=1 so
-sources can guard calls into the library.
+The workspace path defaults to lib/rust and can be overridden per env with
+`custom_rust_lib_dir`. Each workspace crate generates its own C++ header (e.g.
+rust_epub.h); every one is added to the include path. The Rust target is chosen
+from the board MCU; only the ESP32-S3 (Xtensa) is wired up today. The crates
+build against std using the ESP-IDF targets; std's libc/pthread dependencies
+resolve against the ESP-IDF libraries that Arduino-ESP32 already links. Defines
+CROSSPOINT_RUST_LIB=1 so sources can guard calls into the library.
 """
 
 import json
@@ -29,9 +30,9 @@ def fail(msg):
 
 
 project_dir = env.subst("$PROJECT_DIR")  # noqa: F821
-crate_dir = os.path.abspath(os.path.join(
+workspace_dir = os.path.abspath(os.path.join(
     project_dir,
-    env.GetProjectOption("custom_rust_lib_dir", "lib/rust-lib"),  # noqa: F821
+    env.GetProjectOption("custom_rust_lib_dir", "lib/rust"),  # noqa: F821
 ))
 mcu = env.BoardConfig().get("build.mcu")  # noqa: F821
 target = RUST_TARGETS.get(mcu)
@@ -49,9 +50,9 @@ def cargo_env():
 
 def run_cargo(args):
     cmd = ["cargo", "+esp"] + args
-    print(f"build_rust_lib.py: {' '.join(cmd)} (in {crate_dir})")
+    print(f"build_rust_lib.py: {' '.join(cmd)} (in {workspace_dir})")
     try:
-        return subprocess.run(cmd, cwd=crate_dir, env=cargo_env(), check=True, stdout=subprocess.PIPE,
+        return subprocess.run(cmd, cwd=workspace_dir, env=cargo_env(), check=True, stdout=subprocess.PIPE,
                               text=True).stdout
     except FileNotFoundError:
         fail("cargo not found on PATH; install rustup and the esp toolchain (espup)")
@@ -59,11 +60,11 @@ def run_cargo(args):
         fail(f"cargo {args[0]} failed (exit {e.returncode})")
 
 
-def build_crate():
-    """Build the crate and return the build script's OUT_DIR, which holds the
-    generated rust_lib.h."""
+def build_workspace():
+    """Build the workspace and return the OUT_DIR of each workspace crate's
+    build script, which holds that crate's generated header."""
     metadata = json.loads(run_cargo(["metadata", "--no-deps", "--format-version=1"]))
-    package_id = metadata["packages"][0]["id"]
+    member_ids = set(metadata["workspace_members"])
 
     # The esp toolchain ships no prebuilt std for the ESP-IDF targets, so build
     # it from source. Diagnostics are rendered to stderr; stdout carries one
@@ -72,21 +73,24 @@ def build_crate():
         "build", "-Zbuild-std=std,panic_abort", f"--profile={PROFILE}", f"--target={target}",
         "--message-format=json-render-diagnostics",
     ])
+    out_dirs = []
     for line in out.splitlines():
         msg = json.loads(line)
         # Cargo emits this message for fresh build scripts too, not only reruns.
-        if msg.get("reason") == "build-script-executed" and msg.get("package_id") == package_id:
-            return msg["out_dir"]
-    fail("cargo did not report the rust-lib build script's OUT_DIR")
+        if msg.get("reason") == "build-script-executed" and msg.get("package_id") in member_ids:
+            out_dirs.append(msg["out_dir"])
+    if not out_dirs:
+        fail("cargo did not report any workspace build script OUT_DIR")
+    return out_dirs
 
 
 # Only build for actual firmware builds (not e.g. `pio run -t clean` / IDE
 # metadata dumps, which still evaluate pre scripts).
 if not (env.IsCleanTarget() or env.IsIntegrationDump()):  # noqa: F821
-    env.Append(CPPPATH=[build_crate()])  # noqa: F821
+    env.Append(CPPPATH=build_workspace())  # noqa: F821
 
 env.Append(  # noqa: F821
     CPPDEFINES=[("CROSSPOINT_RUST_LIB", 1)],
-    LIBPATH=[os.path.join(crate_dir, "target", target, PROFILE)],
+    LIBPATH=[os.path.join(workspace_dir, "target", target, PROFILE)],
     LIBS=["rust_lib"],
 )

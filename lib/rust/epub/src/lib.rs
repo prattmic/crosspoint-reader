@@ -2,18 +2,13 @@ use phf::phf_map;
 use std::ffi::CStr;
 use std::ffi::c_char;
 
-#[unsafe(no_mangle)]
-pub extern "C" fn rust_lib_add(left: u64, right: u64) -> u64 {
-    left + right
-}
-
 /// Lookup HTML entity from a string slice (not NUL-terminated).
 ///
 /// # Safety
 ///
 /// * c_entity must be null or at least size bytes long.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rust_lib_lookup_html_entity(
+pub unsafe extern "C" fn epub_lookup_html_entity(
     c_entity: *const c_char,
     size: usize,
 ) -> *const c_char {
@@ -288,18 +283,12 @@ static ENTITIES: phf::Map<&'static [u8], &'static CStr> = phf_map! {
 mod tests {
     use super::*;
 
-    #[test]
-    fn add() {
-        let result = rust_lib_add(2, 2);
-        assert_eq!(result, 4);
-    }
-
     // Successful lookup. The input slice does not include NUL.
     #[test]
     fn lookup_html_entity_without_nul() -> Result<(), Box<dyn std::error::Error>> {
         let input = c"&Aacute;";
         let want = "Á";
-        let cchar = unsafe { rust_lib_lookup_html_entity(input.as_ptr(), input.count_bytes()) }; // exclude NUL byte
+        let cchar = unsafe { epub_lookup_html_entity(input.as_ptr(), input.count_bytes()) }; // exclude NUL byte
         assert!(!cchar.is_null());
         let cstr = unsafe { CStr::from_ptr(cchar) };
         let got = cstr.to_str()?;
@@ -311,7 +300,7 @@ mod tests {
     #[test]
     fn lookup_html_entity_with_nul() {
         let input = c"&Aacute;";
-        let cchar = unsafe { rust_lib_lookup_html_entity(input.as_ptr(), input.count_bytes() + 1) }; // include NUL byte
+        let cchar = unsafe { epub_lookup_html_entity(input.as_ptr(), input.count_bytes() + 1) }; // include NUL byte
         assert!(cchar.is_null());
     }
 
@@ -320,7 +309,7 @@ mod tests {
         let input = c"&Aacute;extra stuff";
         let len = 8; // length of "&Aacute;".
         let want = "Á";
-        let cchar = unsafe { rust_lib_lookup_html_entity(input.as_ptr(), len) };
+        let cchar = unsafe { epub_lookup_html_entity(input.as_ptr(), len) };
         assert!(!cchar.is_null());
         let cstr = unsafe { CStr::from_ptr(cchar) };
         let got = cstr.to_str()?;
@@ -331,20 +320,20 @@ mod tests {
     #[test]
     fn lookup_html_entity_mismatch() {
         let input = c"&foo;";
-        let cchar = unsafe { rust_lib_lookup_html_entity(input.as_ptr(), input.count_bytes()) };
+        let cchar = unsafe { epub_lookup_html_entity(input.as_ptr(), input.count_bytes()) };
         assert!(cchar.is_null());
     }
 
     #[test]
     fn lookup_html_entity_null() {
-        let cchar = unsafe { rust_lib_lookup_html_entity(std::ptr::null(), 5) };
+        let cchar = unsafe { epub_lookup_html_entity(std::ptr::null(), 5) };
         assert!(cchar.is_null());
     }
 
     #[test]
     fn lookup_html_entity_zero() {
         let input = c"&Aacute;";
-        let cchar = unsafe { rust_lib_lookup_html_entity(input.as_ptr(), 0) };
+        let cchar = unsafe { epub_lookup_html_entity(input.as_ptr(), 0) };
         assert!(cchar.is_null());
     }
 }

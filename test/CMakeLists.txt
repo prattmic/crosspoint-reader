@@ -37,27 +37,27 @@ target_compile_options(crosspoint_test_common INTERFACE
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
-# Build lib/rust-lib for the host and link it into every test, mirroring the
-# firmware's x4pro-rust env (scripts/build_rust_lib.py), so code guarded by
-# CROSSPOINT_RUST_LIB is tested against the Rust implementation.
-option(CROSSPOINT_RUST_LIB "Build and link lib/rust-lib (requires cargo)" OFF)
+# Build the lib/rust workspace for the host and link it into every test,
+# mirroring the firmware's x4pro-rust env (scripts/build_rust_lib.py), so code
+# guarded by CROSSPOINT_RUST_LIB is tested against the Rust implementation.
+option(CROSSPOINT_RUST_LIB "Build and link the lib/rust workspace (requires cargo)" OFF)
 if(CROSSPOINT_RUST_LIB)
   find_program(CARGO_EXECUTABLE cargo REQUIRED)
   find_package(Threads REQUIRED)
 
-  set(RUST_LIB_CRATE_DIR "${REPO_ROOT}/lib/rust-lib")
+  set(RUST_LIB_WORKSPACE_DIR "${REPO_ROOT}/lib/rust")
   set(RUST_LIB_TARGET_DIR "${CMAKE_CURRENT_BINARY_DIR}/rust-lib")
   set(RUST_LIB_INCLUDE_DIR "${RUST_LIB_TARGET_DIR}/include")
   set(RUST_LIB_ARCHIVE "${RUST_LIB_TARGET_DIR}/release/${CMAKE_STATIC_LIBRARY_PREFIX}rust_lib${CMAKE_STATIC_LIBRARY_SUFFIX}")
 
-  # Always run: cargo tracks the crate's own dependencies and is a fast no-op
+  # Always run: cargo tracks the workspace's own dependencies and is a fast no-op
   # when nothing changed.
   add_custom_target(rust_lib_build
     COMMAND ${CMAKE_COMMAND} -E env CARGO=${CARGO_EXECUTABLE}
       ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/build_rust_lib.py
-      ${RUST_LIB_CRATE_DIR} ${RUST_LIB_TARGET_DIR} release ${RUST_LIB_INCLUDE_DIR}
-    BYPRODUCTS ${RUST_LIB_ARCHIVE} ${RUST_LIB_INCLUDE_DIR}/rust_lib.h
-    COMMENT "Building lib/rust-lib with cargo"
+      ${RUST_LIB_WORKSPACE_DIR} ${RUST_LIB_TARGET_DIR} release ${RUST_LIB_INCLUDE_DIR}
+    BYPRODUCTS ${RUST_LIB_ARCHIVE}
+    COMMENT "Building lib/rust with cargo"
     USES_TERMINAL
   )
 

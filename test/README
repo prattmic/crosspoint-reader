@@ -14,9 +14,9 @@ Run a single suite directly:
 Google Test is fetched via CMake FetchContent on first configure; the pinned
 version lives in test/CMakeLists.txt.
 
-To test against the Rust implementations in lib/rust-lib (as the x4pro-rust
+To test against the Rust implementations in lib/rust (as the x4pro-rust
 firmware env does), configure with -DCROSSPOINT_RUST_LIB=ON. This requires the
-host cargo toolchain; the crate is built into the CMake build directory and
+host cargo toolchain; the workspace is built into the CMake build directory and
 linked into every test, with CROSSPOINT_RUST_LIB defined:
 
   cmake -S test -B build/test-rust -DCROSSPOINT_RUST_LIB=ON

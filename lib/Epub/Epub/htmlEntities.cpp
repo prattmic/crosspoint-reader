@@ -7,7 +7,7 @@
 #include <iterator>
 
 #ifdef CROSSPOINT_RUST_LIB
-#include <rust_lib.h>
+#include <rust_epub.h>
 #endif
 
 struct EntityPair {
@@ -89,7 +89,7 @@ static_assert(isTableSorted(), "ENTITY_LOOKUP must be sorted lexicographically b
 // Lookup a single HTML entity and return its UTF-8 value.
 const char* lookupHtmlEntity(const char* entity, size_t len) {
 #ifdef CROSSPOINT_RUST_LIB
-  return rust_lib_lookup_html_entity(entity, len);
+  return epub_lookup_html_entity(entity, len);
 #endif
 
   if (entity == nullptr || len == 0) return nullptr;
